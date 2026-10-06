@@ -1,0 +1,42 @@
+{
+    "name": "coderemon24/lkms",
+    "description": "Zero-configuration, drop-in software licensing client with RSA-2048 verification and tamper protection",
+    "keywords": [
+        "laravel",
+        "licensing",
+        "software-license",
+        "copy-protection",
+        "rsa-signature",
+        "lkms"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ahmed Emon",
+            "email": "ahmedemon.dev24@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "guzzlehttp/guzzle": "^7.8"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Lkms\\Client\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Lkms\\Client\\LkmsLicenseServiceProvider"
+            ]
+        }
+    }
+}
