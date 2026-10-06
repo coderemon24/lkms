@@ -118,6 +118,18 @@ class LeaseStorageService
             return false;
         }
 
+        // 10. HTTP Request Timeout check (Allowed range: 1 to 15 seconds maximum)
+        $timeout = config('lkms.timeout');
+        if ($timeout !== null && (!is_numeric($timeout) || (int) $timeout < 1 || (int) $timeout > 15)) {
+            return false; // Tampered timeout!
+        }
+
+        // 11. Redirect after activation check
+        $redirect = config('lkms.redirect_after_activation');
+        if (empty($redirect) || !is_string($redirect)) {
+            return false;
+        }
+
         return true;
     }
 

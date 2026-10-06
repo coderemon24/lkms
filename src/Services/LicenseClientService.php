@@ -128,7 +128,7 @@ class LicenseClientService
         $serverUrl = rtrim((string) $baseUrl, '/') . '/license/heartbeat';
         $meta = $this->fingerprint->collect();
 
-        $timeout = (int) config('lkms.timeout', 3);
+        $timeout = max(1, min((int) (config('lkms.timeout') ?? 3), 15));
         $clientId = (string) config('lkms.client_id');
         $clientSecret = (string) config('lkms.client_secret');
         $nonce = Str::random(32);
