@@ -4,7 +4,7 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/coderemon24/lkms.svg?style=flat-square)](https://packagist.org/packages/coderemon24/lkms)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
-A zero-configuration, drop-in commercial software licensing client for Laravel applications. Features asymmetric RSA-2048 digital signature verification, dynamic domain and hardware binding, an offline grace period, active-state route lockout, centralized remote lock messaging, stealth auto-enforcement, and bytecode anti-tamper protection.
+A zero-configuration, drop-in commercial software licensing client for Laravel applications. Features asymmetric RSA-2048 digital signature verification, dynamic domain and hardware binding, an offline grace period, active-state route lockout, centralized remote lock messaging, stealth auto-enforcement, cron-less automatic heartbeat synchronization, and bytecode anti-tamper protection.
 
 ---
 
@@ -107,6 +107,7 @@ PQ7jFTT0S9M/hrUN/aK85xysAwxXZC+Wyib3gBwy/cWCxtlLPqSyLCG/oAyRILLe...
 -----END PUBLIC KEY-----
 PEM,
     'grace_period_days' => 7,
+    'heartbeat_hours' => 24,
     'auto_enforce' => env('LKMS_AUTO_ENFORCE', true),
     'redirect_after_activation' => '/',
 ];
@@ -145,9 +146,19 @@ PEM,
 
 ---
 
-## ⏰ 6. Scheduled Heartbeat & Offline Grace Period
+## ⏰ 6. Heartbeat Sync Engine & Offline Grace Period
 
-Add the heartbeat command to your client application's `routes/console.php`:
+### Is a Cron Job Mandatory? **NO!**
+LKMS features a **Dual-Sync Engine**: it syncs automatically through regular visitor traffic even if the client never sets up a Cron Job!
+
+#### Mode 1: Automated Web-Traffic Sync (Zero Setup / Cron-less)
+* When normal users or visitors browse any page of the client application, the `EnforceLicense` middleware checks whether 24 hours have elapsed since the last heartbeat (`shouldSyncHeartbeat()`).
+* If sync is due, the package triggers the heartbeat using Laravel's `app()->terminating(...)` hook.
+* **Zero Latency:** The terminating callback executes **after** the HTTP response has already been sent to the visitor's browser (FastCGI finish request). The visitor experiences **zero lag or page delay**.
+* If a visitor visits the site even once a day, the lease stays renewed seamlessly!
+
+#### Mode 2: Scheduled Cron Job (Optional / Recommended for Low-Traffic Sites)
+If the client site receives very little traffic, add the scheduled command to `routes/console.php`:
 
 ```php
 use Illuminate\Support\Facades\Schedule;
@@ -155,9 +166,9 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('lkms:heartbeat')->daily();
 ```
 
-* **Lease Renewal:** Renews the 24-hour lease token with the central authority.
-* **Offline Grace Period:** If the central server or client internet is temporarily down, the software continues to run seamlessly for **7 days**.
-* **Remote Kill-Switch:** If you suspend or revoke a license in your LKMS Admin Dashboard, the client software locks automatically upon the next heartbeat.
+* **Lease Renewal:** Renews the 24-hour cryptographic lease token with the central authority.
+* **Offline Grace Period (7 Days):** If the client server loses internet or your central licensing server experiences maintenance, the client software continues to function normally for **7 full days** (`grace_period_days => 7`).
+* **Remote Kill-Switch:** If you suspend, revoke, or lock a license in your LKMS Admin Dashboard, the client software locks automatically upon the next heartbeat sync.
 
 ---
 
@@ -176,7 +187,31 @@ When a client application is locked or suspended, you can show a **customized no
 
 ---
 
-## 🔐 8. Bytecode Encoding (ionCube / SourceGuardian)
+## ❓ 8. Security & Tamper FAQ: What Happens If Someone Removes `server_url`?
+
+If a client attempts to bypass the licensing system by deleting or emptying `'server_url'` in `config/lkms.php`, here is what happens:
+
+### Case 1: Unactivated Installation
+* The client visits `/license/activate` and tries to submit a license key.
+* The activation request fails immediately with the error:
+  > `"Central license server URL is missing or not configured in config/lkms.php."`
+* No RSA-2048 lease token is generated. **The application remains 100% locked.**
+
+### Case 2: Already Activated Installation
+* For standard web requests, the package verifies the lease locally using the embedded RSA Public Key and DB HMAC checksum (it does not require an active server connection on every HTTP request).
+* **HOWEVER:** Because `server_url` is removed, the background heartbeat (via cron or web-traffic) fails to reach the central server to renew the lease timestamp (`last_synced_at`).
+* Once the **7-Day Grace Period** (`grace_period_days => 7`) expires:
+  ```php
+  // LeaseStorageService.php
+  if ($lastSynced && $lastSynced->addDays($graceDays)->isPast()) {
+      return false; // Grace period expired without online heartbeat!
+  }
+  ```
+* **Result:** After 7 days, the software automatically and permanently **self-locks**, redirecting all visitors to `/license/locked`. The client cannot bypass the license by removing the server URL!
+
+---
+
+## 🔐 9. Bytecode Encoding (ionCube / SourceGuardian)
 
 To ensure clients cannot open and tamper with the PHP source files on their server:
 1. Run the encoder compiler:

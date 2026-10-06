@@ -128,6 +128,28 @@ class LeaseStorageService
     }
 
     /**
+     * Determine if a periodic heartbeat synchronization is due.
+     */
+    public function shouldSyncHeartbeat(): bool
+    {
+        if (!Schema::hasTable('lkms_leases')) {
+            return false;
+        }
+
+        $record = DB::table('lkms_leases')->first();
+        if (!$record || $record->status !== 'active') {
+            return false;
+        }
+
+        if (empty($record->last_synced_at)) {
+            return true;
+        }
+
+        $syncHours = (int) config('lkms.heartbeat_hours', 24);
+        return Carbon::parse($record->last_synced_at)->addHours($syncHours)->isPast();
+    }
+
+    /**
      * Revoke or suspend local lease immediately with server lock message.
      */
     public function revokeLocalLease(string $status = 'revoked', ?string $lockMessage = null, ?string $supportContact = null): void

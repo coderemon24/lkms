@@ -42,6 +42,17 @@ class EnforceLicense
             return redirect()->route('lkms.activate');
         }
 
+        // Opportunistic Web-Traffic Heartbeat (Runs after response is sent, requires NO client cron)
+        if ($this->storage->shouldSyncHeartbeat()) {
+            app()->terminating(function () {
+                try {
+                    app(\Lkms\Client\Services\LicenseClientService::class)->heartbeat();
+                } catch (\Throwable $e) {
+                    // Suppress background sync errors so user response is unaffected
+                }
+            });
+        }
+
         return $next($request);
     }
 }

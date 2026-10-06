@@ -18,7 +18,15 @@ class LicenseClientService
      */
     public function activate(string $licenseKey): array
     {
-        $serverUrl = rtrim(config('lkms.server_url'), '/') . '/license/activate';
+        $baseUrl = config('lkms.server_url');
+        if (empty($baseUrl)) {
+            return [
+                'success' => false,
+                'message' => 'Central license server URL is missing or not configured in config/lkms.php.',
+            ];
+        }
+
+        $serverUrl = rtrim((string) $baseUrl, '/') . '/license/activate';
         $meta = $this->fingerprint->collect();
 
         $nonce = Str::random(32);
@@ -93,7 +101,15 @@ class LicenseClientService
             return ['success' => false, 'message' => 'No active license to sync.'];
         }
 
-        $serverUrl = rtrim(config('lkms.server_url'), '/') . '/license/heartbeat';
+        $baseUrl = config('lkms.server_url');
+        if (empty($baseUrl)) {
+            return [
+                'success' => false,
+                'message' => 'Central license server URL is missing or not configured in config/lkms.php.',
+            ];
+        }
+
+        $serverUrl = rtrim((string) $baseUrl, '/') . '/license/heartbeat';
         $meta = $this->fingerprint->collect();
 
         try {
