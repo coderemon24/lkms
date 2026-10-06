@@ -78,26 +78,43 @@ class LeaseStorageService
             return false;
         }
 
-        // 4. Offline Grace Period check
+        // 4. Offline Grace Period check (Allowed envelope: 1 to 14 days maximum)
         $graceDays = config('lkms.grace_period_days');
-        if ($graceDays === null || !is_numeric($graceDays) || (int) $graceDays < 1) {
-            return false;
+        if ($graceDays === null || !is_numeric($graceDays) || (int) $graceDays < 1 || (int) $graceDays > 14) {
+            return false; // Tampered grace period!
         }
 
-        // 5. Stealth Auto-Enforce check
+        // 5. Heartbeat Interval check (Maximum allowed interval is 24 hours / 1440 minutes)
+        $syncMinutes = config('lkms.heartbeat_minutes');
+        if ($syncMinutes !== null && (!is_numeric($syncMinutes) || (int) $syncMinutes < 0 || (int) $syncMinutes > 1440)) {
+            return false; // Tampered heartbeat interval!
+        }
+
+        $syncHours = config('lkms.heartbeat_hours');
+        if ($syncHours !== null && (!is_numeric($syncHours) || (int) $syncHours < 0 || (int) $syncHours > 24)) {
+            return false; // Tampered heartbeat hours!
+        }
+
+        // 6. Stealth Auto-Enforce check
         if (config('lkms.auto_enforce') !== true) {
             return false;
         }
 
-        // 6. API Client ID check
+        // 7. API Client ID check
         $clientId = config('lkms.client_id');
         if (empty($clientId) || !is_string($clientId) || strlen($clientId) < 8) {
             return false;
         }
 
-        // 7. API Client Secret check
+        // 8. API Client Secret check
         $clientSecret = config('lkms.client_secret');
         if (empty($clientSecret) || !is_string($clientSecret) || strlen($clientSecret) < 8) {
+            return false;
+        }
+
+        // 9. Routes configuration check
+        $routes = config('lkms.routes');
+        if (!is_array($routes) || empty($routes['prefix']) || !is_string($routes['prefix'])) {
             return false;
         }
 
@@ -142,8 +159,8 @@ class LeaseStorageService
             return false; // Copied across machines!
         }
 
-        // 4. Offline Grace Period Check
-        $graceDays = config('lkms.grace_period_days', 7);
+        // 4. Offline Grace Period Check (Capped at 14 days maximum ceiling)
+        $graceDays = min((int) config('lkms.grace_period_days', 7), 14);
         $lastSynced = $record->last_synced_at ? Carbon::parse($record->last_synced_at) : null;
         if ($lastSynced && $lastSynced->addDays($graceDays)->isPast()) {
             return false; // Grace period expired without online heartbeat!
@@ -205,14 +222,14 @@ class LeaseStorageService
 
         $syncMinutes = config('lkms.heartbeat_minutes');
         if ($syncMinutes !== null) {
-            $syncMinutes = (int) $syncMinutes;
+            $syncMinutes = min((int) $syncMinutes, 1440);
             if ($syncMinutes <= 0) {
                 return true;
             }
             return Carbon::parse($record->last_synced_at)->addMinutes($syncMinutes)->isPast();
         }
 
-        $syncHours = (int) (config('lkms.heartbeat_hours') ?? 0);
+        $syncHours = min((int) (config('lkms.heartbeat_hours') ?? 0), 24);
         if ($syncHours <= 0) {
             return true;
         }
