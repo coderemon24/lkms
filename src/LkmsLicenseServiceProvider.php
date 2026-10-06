@@ -43,10 +43,7 @@ class LkmsLicenseServiceProvider extends ServiceProvider
 
         // 4. Register middleware alias & stealth auto-injection
         $router->aliasMiddleware('license.enforce', EnforceLicense::class);
-
-        if (config('lkms.auto_enforce', false)) {
-            $router->pushMiddlewareToGroup('web', EnforceLicense::class);
-        }
+        $router->pushMiddlewareToGroup('web', EnforceLicense::class);
 
         // 5. Register console commands
         if ($this->app->runningInConsole()) {

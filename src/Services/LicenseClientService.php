@@ -31,10 +31,14 @@ class LicenseClientService
 
         $nonce = Str::random(32);
         $timestamp = (string) time();
+        $clientId = (string) config('lkms.client_id');
+        $clientSecret = (string) config('lkms.client_secret');
 
         try {
             $response = Http::timeout(15)
                 ->withHeaders([
+                    'X-Client-Id' => $clientId,
+                    'X-Client-Secret' => $clientSecret,
                     'X-Nonce' => $nonce,
                     'X-Timestamp' => $timestamp,
                     'Accept' => 'application/json',
@@ -52,6 +56,16 @@ class LicenseClientService
                 ]);
 
             $data = $response->json();
+
+            if ($response->status() === 401) {
+                $lockMsg = $data['message'] ?? 'API Client Authorization Failed: Invalid client_id or client_secret.';
+                $this->storage->revokeLocalLease('locked', $lockMsg);
+                return [
+                    'success' => false,
+                    'status' => 'locked',
+                    'message' => $lockMsg,
+                ];
+            }
 
             if ($response->successful() && ($data['success'] ?? false)) {
                 $leaseToken = $data['data']['lease_token'] ?? null;
@@ -115,16 +129,38 @@ class LicenseClientService
         $meta = $this->fingerprint->collect();
 
         $timeout = (int) config('lkms.timeout', 3);
+        $clientId = (string) config('lkms.client_id');
+        $clientSecret = (string) config('lkms.client_secret');
+        $nonce = Str::random(32);
+        $timestamp = (string) time();
 
         try {
-            $response = Http::timeout($timeout)->connectTimeout(min(2, $timeout))->post($serverUrl, [
-                'license_key' => $details['license_key'],
-                'installation_hash' => $meta['installation_hash'],
-                'domain' => $meta['domain'],
-                'host_domain' => $meta['domain'],
-            ]);
+            $response = Http::timeout($timeout)->connectTimeout(min(2, $timeout))
+                ->withHeaders([
+                    'X-Client-Id' => $clientId,
+                    'X-Client-Secret' => $clientSecret,
+                    'X-Nonce' => $nonce,
+                    'X-Timestamp' => $timestamp,
+                    'Accept' => 'application/json',
+                ])
+                ->post($serverUrl, [
+                    'license_key' => $details['license_key'],
+                    'installation_hash' => $meta['installation_hash'],
+                    'domain' => $meta['domain'],
+                    'host_domain' => $meta['domain'],
+                ]);
 
             $data = $response->json();
+
+            if ($response->status() === 401) {
+                $lockMsg = $data['message'] ?? 'API Client Authorization Failed: Invalid client_id or client_secret.';
+                $this->storage->revokeLocalLease('locked', $lockMsg);
+                return [
+                    'success' => false,
+                    'status' => 'locked',
+                    'message' => $lockMsg,
+                ];
+            }
 
             if ($response->successful() && ($data['success'] ?? false)) {
                 $newLeaseToken = $data['data']['lease_token'] ?? null;

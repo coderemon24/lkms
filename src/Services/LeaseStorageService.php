@@ -89,6 +89,18 @@ class LeaseStorageService
             return false;
         }
 
+        // 6. API Client ID check
+        $clientId = config('lkms.client_id');
+        if (empty($clientId) || !is_string($clientId) || strlen($clientId) < 8) {
+            return false;
+        }
+
+        // 7. API Client Secret check
+        $clientSecret = config('lkms.client_secret');
+        if (empty($clientSecret) || !is_string($clientSecret) || strlen($clientSecret) < 8) {
+            return false;
+        }
+
         return true;
     }
 
