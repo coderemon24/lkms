@@ -145,8 +145,22 @@ class LeaseStorageService
             return true;
         }
 
-        $syncHours = (int) config('lkms.heartbeat_hours', 24);
+        $syncHours = (int) config('lkms.heartbeat_hours', 0);
+        if ($syncHours <= 0) {
+            return true;
+        }
+
         return Carbon::parse($record->last_synced_at)->addHours($syncHours)->isPast();
+    }
+
+    /**
+     * Clear and delete local lease completely (e.g. when license is deleted from authority).
+     */
+    public function clearLease(): void
+    {
+        if (Schema::hasTable('lkms_leases')) {
+            DB::table('lkms_leases')->truncate();
+        }
     }
 
     /**

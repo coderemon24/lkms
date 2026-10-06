@@ -31,8 +31,11 @@ PEM,
     // Offline Grace Period (Days allowed if central server is offline)
     'grace_period_days' => 7,
 
-    // Heartbeat Sync Interval (Hours)
-    'heartbeat_hours' => 24,
+    // Heartbeat Sync Interval (Hours) - 0 = Instant live check on requests
+    'heartbeat_hours' => env('LKMS_HEARTBEAT_HOURS', 0),
+
+    // Outgoing HTTP request timeout (seconds)
+    'timeout' => env('LKMS_HTTP_TIMEOUT', 3),
 
     // Route Configuration
     'routes' => [
@@ -42,7 +45,7 @@ PEM,
 
     // Stealth Mode: Automatically inject license enforcement into the 'web' group
     // No manual registration required in bootstrap/app.php
-    'auto_enforce' => env('LKMS_AUTO_ENFORCE', false),
+    'auto_enforce' => env('LKMS_AUTO_ENFORCE', true),
 
     // Redirect Target upon Successful Activation
     'redirect_after_activation' => '/',

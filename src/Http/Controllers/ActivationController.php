@@ -80,6 +80,10 @@ class ActivationController extends Controller
         $domain = $this->fingerprint->getDomain();
         $details = $this->storage->getLeaseDetails();
 
+        if (!$details) {
+            return redirect()->route('lkms.activate');
+        }
+
         return view('lkms::locked', compact('domain', 'details'));
     }
 }

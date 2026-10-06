@@ -72,8 +72,10 @@ class LicenseClientService
             $lockMsg = $data['lock_message'] ?? $data['message'] ?? 'License activation was rejected by central authority.';
             $contact = $data['support_contact'] ?? null;
 
-            if (in_array($data['status'] ?? '', ['suspended', 'revoked', 'expired'])) {
-                $this->storage->revokeLocalLease($data['status'], $lockMsg, $contact);
+            $serverStatus = $data['status'] ?? 'suspended';
+            if (in_array($serverStatus, ['suspended', 'revoked', 'expired', 'deactivated', 'unregistered_installation', 'locked'])) {
+                $lockStatus = in_array($serverStatus, ['revoked', 'expired', 'locked']) ? $serverStatus : 'suspended';
+                $this->storage->revokeLocalLease($lockStatus, $lockMsg, $contact);
             }
 
             return [
@@ -112,11 +114,14 @@ class LicenseClientService
         $serverUrl = rtrim((string) $baseUrl, '/') . '/license/heartbeat';
         $meta = $this->fingerprint->collect();
 
+        $timeout = (int) config('lkms.timeout', 3);
+
         try {
-            $response = Http::timeout(10)->post($serverUrl, [
+            $response = Http::timeout($timeout)->connectTimeout(min(2, $timeout))->post($serverUrl, [
                 'license_key' => $details['license_key'],
                 'installation_hash' => $meta['installation_hash'],
                 'domain' => $meta['domain'],
+                'host_domain' => $meta['domain'],
             ]);
 
             $data = $response->json();
@@ -134,14 +139,25 @@ class LicenseClientService
 
             $lockMsg = $data['lock_message'] ?? $data['message'] ?? 'License has been locked by authority.';
             $contact = $data['support_contact'] ?? null;
+            $serverStatus = $data['status'] ?? 'suspended';
+
+            // If license was deleted / not recognized on central server, purge local lease completely
+            if ($serverStatus === 'not_found' || $response->status() === 404) {
+                $this->storage->clearLease();
+                return [
+                    'success' => false,
+                    'status' => 'not_found',
+                    'message' => 'License key was deleted or not recognized by central authority.',
+                ];
+            }
 
             // Check if server revoked, suspended, or expired this license
-            if (in_array($data['status'] ?? '', ['revoked', 'suspended', 'expired', 'domain_mismatch'])) {
-                $this->storage->revokeLocalLease($data['status'], $lockMsg, $contact);
-            }
+            $lockStatus = in_array($serverStatus, ['revoked', 'expired', 'domain_mismatch', 'locked']) ? $serverStatus : 'suspended';
+            $this->storage->revokeLocalLease($lockStatus, $lockMsg, $contact);
 
             return [
                 'success' => false,
+                'status' => $lockStatus,
                 'message' => $lockMsg,
                 'lock_message' => $lockMsg,
                 'support_contact' => $contact,

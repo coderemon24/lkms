@@ -23,6 +23,33 @@ class EnforceLicense
             return $next($request);
         }
 
+        // Live Heartbeat Sync: Check central authority when due or in realtime mode
+        if ($this->storage->shouldSyncHeartbeat()) {
+            try {
+                $syncResult = app(\Lkms\Client\Services\LicenseClientService::class)->heartbeat();
+                if (!($syncResult['success'] ?? false) && !$this->storage->isSoftwareActive()) {
+                    $details = $this->storage->getLeaseDetails();
+
+                    if ($request->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'status' => $details['status'] ?? 'unlicensed',
+                            'message' => $details['lock_message'] ?? 'Software license is invalid, expired, or locked on this domain.',
+                            'support_contact' => $details['support_contact'] ?? null,
+                        ], 403);
+                    }
+
+                    if ($details && !empty($details['status']) && $details['status'] !== 'active') {
+                        return redirect()->route('lkms.locked');
+                    }
+
+                    return redirect()->route('lkms.activate');
+                }
+            } catch (\Throwable $e) {
+                // Suppress network errors: Fall back to local offline grace period
+            }
+        }
+
         if (!$this->storage->isSoftwareActive()) {
             $details = $this->storage->getLeaseDetails();
 
@@ -35,22 +62,11 @@ class EnforceLicense
                 ], 403);
             }
 
-            if ($details && in_array($details['status'] ?? '', ['revoked', 'suspended', 'expired', 'domain_mismatch', 'locked'])) {
+            if ($details && !empty($details['status']) && $details['status'] !== 'active') {
                 return redirect()->route('lkms.locked');
             }
 
             return redirect()->route('lkms.activate');
-        }
-
-        // Opportunistic Web-Traffic Heartbeat (Runs after response is sent, requires NO client cron)
-        if ($this->storage->shouldSyncHeartbeat()) {
-            app()->terminating(function () {
-                try {
-                    app(\Lkms\Client\Services\LicenseClientService::class)->heartbeat();
-                } catch (\Throwable $e) {
-                    // Suppress background sync errors so user response is unaffected
-                }
-            });
         }
 
         return $next($request);
