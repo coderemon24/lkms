@@ -145,7 +145,16 @@ class LeaseStorageService
             return true;
         }
 
-        $syncHours = (int) config('lkms.heartbeat_hours', 0);
+        $syncMinutes = config('lkms.heartbeat_minutes');
+        if ($syncMinutes !== null) {
+            $syncMinutes = (int) $syncMinutes;
+            if ($syncMinutes <= 0) {
+                return true;
+            }
+            return Carbon::parse($record->last_synced_at)->addMinutes($syncMinutes)->isPast();
+        }
+
+        $syncHours = (int) (config('lkms.heartbeat_hours') ?? 0);
         if ($syncHours <= 0) {
             return true;
         }

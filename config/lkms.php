@@ -31,8 +31,11 @@ PEM,
     // Offline Grace Period (Days allowed if central server is offline)
     'grace_period_days' => 7,
 
-    // Heartbeat Sync Interval (Hours) - 0 = Instant live check on requests
-    'heartbeat_hours' => env('LKMS_HEARTBEAT_HOURS', 0),
+    // Heartbeat Sync Interval in Minutes (e.g. 1, 5, 60). Set to 0 for instant live check on every request
+    'heartbeat_minutes' => env('LKMS_HEARTBEAT_MINUTES', 0),
+
+    // Backward-compatible Heartbeat Sync Interval in Hours (if heartbeat_minutes is not set)
+    'heartbeat_hours' => env('LKMS_HEARTBEAT_HOURS', null),
 
     // Outgoing HTTP request timeout (seconds)
     'timeout' => env('LKMS_HTTP_TIMEOUT', 3),
