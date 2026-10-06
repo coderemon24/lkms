@@ -18,7 +18,28 @@ class EnforceLicense
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Allow activation and locked screens without restriction
+        // Always allow locked screen so user sees lock details
+        if ($request->is('license/locked')) {
+            return $next($request);
+        }
+
+        // 1. Mandatory Configuration Integrity Check
+        if (!$this->storage->isConfigValid()) {
+            $lockMsg = 'Software configuration integrity check failed: config/lkms.php is missing or critical license settings (server_url, public_key) have been removed or tampered.';
+            $this->storage->revokeLocalLease('locked', $lockMsg);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'locked',
+                    'message' => $lockMsg,
+                ], 403);
+            }
+
+            return redirect()->route('lkms.locked');
+        }
+
+        // Allow activation screens without restriction if config is intact
         if ($request->is('license/*') || $request->is('license')) {
             return $next($request);
         }

@@ -25,6 +25,10 @@ class ActivationController extends Controller
      */
     public function showActivate(Request $request): View|RedirectResponse
     {
+        if (!$this->storage->isConfigValid()) {
+            return redirect()->route('lkms.locked');
+        }
+
         // Once active, lock out this route unless ?force=1 is passed
         if ($this->storage->isSoftwareActive() && !$request->boolean('force')) {
             return redirect(config('lkms.redirect_after_activation', '/'))
@@ -71,6 +75,16 @@ class ActivationController extends Controller
                 return redirect(config('lkms.redirect_after_activation', '/'))
                     ->with('success', 'License verified with central authority! Software unlocked.');
             }
+        }
+
+        if (!$this->storage->isConfigValid()) {
+            $domain = $this->fingerprint->getDomain();
+            $details = [
+                'status' => 'locked',
+                'lock_message' => 'Software configuration integrity check failed: config/lkms.php is missing or critical license settings (server_url, public_key) have been removed or tampered.',
+                'support_contact' => config('lkms.support_contact', 'support@yourdomain.com'),
+            ];
+            return view('lkms::locked', compact('domain', 'details'));
         }
 
         if ($this->storage->isSoftwareActive()) {

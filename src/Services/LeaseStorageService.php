@@ -51,10 +51,56 @@ class LeaseStorageService
     }
 
     /**
+     * Validate the presence and integrity of config/lkms.php and mandatory parameters.
+     */
+    public function isConfigValid(): bool
+    {
+        // 1. Config file existence check in Laravel application
+        if (function_exists('config_path')) {
+            $publishedConfig = config_path('lkms.php');
+            if (!file_exists($publishedConfig)) {
+                return false;
+            }
+        }
+
+        // 2. Central Server URL check
+        $serverUrl = config('lkms.server_url');
+        if (empty($serverUrl) || !is_string($serverUrl) || (!str_starts_with($serverUrl, 'http://') && !str_starts_with($serverUrl, 'https://'))) {
+            return false;
+        }
+
+        // 3. Embedded Cryptographic Public Key check
+        $publicKey = config('lkms.public_key');
+        if (empty($publicKey) || !is_string($publicKey)) {
+            return false;
+        }
+        if (!str_contains($publicKey, '-----BEGIN PUBLIC KEY-----') || !str_contains($publicKey, '-----END PUBLIC KEY-----')) {
+            return false;
+        }
+
+        // 4. Offline Grace Period check
+        $graceDays = config('lkms.grace_period_days');
+        if ($graceDays === null || !is_numeric($graceDays) || (int) $graceDays < 1) {
+            return false;
+        }
+
+        // 5. Stealth Auto-Enforce check
+        if (config('lkms.auto_enforce') !== true) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Determine if software is currently licensed and active.
      */
     public function isSoftwareActive(): bool
     {
+        if (!$this->isConfigValid()) {
+            return false;
+        }
+
         if (!Schema::hasTable('lkms_leases')) {
             return false;
         }
